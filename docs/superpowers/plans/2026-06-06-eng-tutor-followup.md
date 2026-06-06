@@ -1,0 +1,394 @@
+# eng-tutor-followup Plugin Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build and publish a Claude Code plugin that injects English-tutor instructions at session start so Claude occasionally shows inline "more natural English" tips based on the user's own prompts.
+
+**Architecture:** A `SessionStart` hook (registered in `hooks/hooks.json`) runs a static bash script that emits `hookSpecificOutput.additionalContext` JSON containing the tutor instructions. The main model produces the tips inline — no extra API calls or processes. The repo doubles as a single-plugin marketplace via `.claude-plugin/marketplace.json` and is published as a public GitHub repo `gutnikov/eng-tutor-followup`.
+
+**Tech Stack:** Bash, JSON, `jq` (tests), `gh` CLI (publishing). No runtime dependencies beyond bash.
+
+**Spec:** `docs/superpowers/specs/2026-06-06-eng-tutor-followup-design.md`
+
+**Working directory:** `/Users/agutnikov/work/projects/eng-tutor-followup` (already a git repo on `main`, contains only `docs/`)
+
+---
+
+## File Structure
+
+```
+eng-tutor-followup/
+├── .claude-plugin/
+│   ├── plugin.json          # plugin manifest (Task 2)
+│   └── marketplace.json     # single-plugin marketplace manifest (Task 2)
+├── hooks/
+│   └── hooks.json           # registers SessionStart hook (Task 3)
+├── hooks-handlers/
+│   └── session-start.sh     # emits additionalContext JSON (Task 3)
+├── tests/
+│   └── validate.sh          # jq-based validation of all JSON artifacts (Task 1)
+├── docs/superpowers/        # spec + this plan (already committed)
+├── README.md                # docs + install instructions (Task 4)
+└── LICENSE                  # MIT (Task 4)
+```
+
+---
+
+### Task 1: Validation test script (failing first)
+
+**Files:**
+- Create: `tests/validate.sh`
+
+- [ ] **Step 1: Write the validation script**
+
+Create `tests/validate.sh` with exactly this content:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "1. plugin.json is valid and correctly named"
+jq -e '.name == "eng-tutor-followup"' .claude-plugin/plugin.json > /dev/null
+
+echo "2. marketplace.json lists this repo as the plugin source"
+jq -e '.plugins[0].name == "eng-tutor-followup" and .plugins[0].source == "./"' .claude-plugin/marketplace.json > /dev/null
+
+echo "3. hooks.json registers a SessionStart command hook"
+jq -e '.hooks.SessionStart[0].hooks[0].type == "command"' hooks/hooks.json > /dev/null
+
+echo "4. session-start.sh emits valid SessionStart hook JSON"
+out="$(bash hooks-handlers/session-start.sh)"
+echo "$out" | jq -e '.hookSpecificOutput.hookEventName == "SessionStart"' > /dev/null
+echo "$out" | jq -e '.hookSpecificOutput.additionalContext | length > 200' > /dev/null
+
+echo "ALL CHECKS PASS"
+```
+
+- [ ] **Step 2: Make it executable and run it to verify it fails**
+
+Run: `chmod +x tests/validate.sh && bash tests/validate.sh`
+Expected: prints `1. plugin.json is valid and correctly named`, then FAILS with a jq error (`Could not open file .claude-plugin/plugin.json`) and non-zero exit — none of the artifacts exist yet.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add tests/validate.sh
+git commit -m "test: add validation script for plugin artifacts"
+```
+
+---
+
+### Task 2: Plugin and marketplace manifests
+
+**Files:**
+- Create: `.claude-plugin/plugin.json`
+- Create: `.claude-plugin/marketplace.json`
+
+- [ ] **Step 1: Write `.claude-plugin/plugin.json`**
+
+```json
+{
+  "name": "eng-tutor-followup",
+  "version": "1.0.0",
+  "description": "Occasional inline tips that make your English sound more natural — like a teacher's followup notes after a lesson",
+  "author": {
+    "name": "Alex Gutnikov",
+    "email": "agutnikov@vivid.money"
+  }
+}
+```
+
+- [ ] **Step 2: Write `.claude-plugin/marketplace.json`**
+
+```json
+{
+  "name": "eng-tutor-followup",
+  "owner": {
+    "name": "gutnikov"
+  },
+  "plugins": [
+    {
+      "name": "eng-tutor-followup",
+      "source": "./",
+      "description": "Occasional inline tips that make your English sound more natural — like a teacher's followup notes after a lesson"
+    }
+  ]
+}
+```
+
+- [ ] **Step 3: Run validation — checks 1–2 pass, check 3 fails**
+
+Run: `bash tests/validate.sh`
+Expected: lines 1 and 2 print, then FAILS at check 3 (`Could not open file hooks/hooks.json`) — hooks don't exist yet.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .claude-plugin/
+git commit -m "feat: add plugin and marketplace manifests"
+```
+
+---
+
+### Task 3: SessionStart hook registration and handler
+
+**Files:**
+- Create: `hooks/hooks.json`
+- Create: `hooks-handlers/session-start.sh`
+
+- [ ] **Step 1: Write `hooks/hooks.json`**
+
+```json
+{
+  "description": "English tutor hook that adds inline English-tip instructions",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks-handlers/session-start.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- [ ] **Step 2: Write `hooks-handlers/session-start.sh`**
+
+Exactly this content (the heredoc is single-quoted so nothing is shell-expanded; all inner double quotes inside the JSON string are `\"`-escaped):
+
+```bash
+#!/usr/bin/env bash
+
+# Inject English-tutor instructions as additionalContext at session start.
+# Mirrors the SessionStart pattern of the official explanatory-output-style plugin.
+
+cat << 'EOF'
+{
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": "You have a secondary, low-priority role: an English writing tutor for the user, a non-native English speaker. As you work on their tasks, quietly notice the English in the user's own messages (not code, not logs, not quoted text, not your own output).\n\nWhen you spot a genuinely notable improvement, append a tip at the END of your response using this format (with backticks):\n\"`★ English tip ─────────────────────────────────`\nYou wrote:      \"<the user's phrasing>\"\nMore natural:   \"<improved phrasing>\"\n<1-2 short sentences: why, plus a quick usage example or context if it helps>\n`─────────────────────────────────────────────────`\"\n\nRules:\n- Focus on naturalness, word choice, collocations, idioms, and professional/business register (Slack messages, PR descriptions, emails). Not grammar nitpicks — only flag grammar if it changes meaning or would confuse a reader.\n- Maximum 1-2 tips per session. Most sessions should have zero. Never invent a tip just to fill a quota.\n- Keep tips short and interesting — include a quick example or the context where the phrase shines. Never lecture.\n- Skip terse command-like prompts (\"fix it\", \"y\", \"run tests\") — only comment on real sentences where phrasing matters.\n- The task always comes first; tutoring never interferes with it.\n\nExample of a good tip: the user wrote \"fast software development cycle\" → more natural: \"rapid development cycle\" (\"rapid\" collocates with cycle/pace/iteration; \"fast\" isn't wrong, just less idiomatic)."
+  }
+}
+EOF
+
+exit 0
+```
+
+- [ ] **Step 3: Make the handler executable**
+
+Run: `chmod +x hooks-handlers/session-start.sh`
+
+- [ ] **Step 4: Run validation — all checks pass**
+
+Run: `bash tests/validate.sh`
+Expected output:
+
+```
+1. plugin.json is valid and correctly named
+2. marketplace.json lists this repo as the plugin source
+3. hooks.json registers a SessionStart command hook
+4. session-start.sh emits valid SessionStart hook JSON
+ALL CHECKS PASS
+```
+
+If check 4 fails with a jq parse error, the escaping in the heredoc JSON is broken — fix `session-start.sh` until `bash hooks-handlers/session-start.sh | jq .` parses cleanly.
+
+- [ ] **Step 5: Validate with the Claude Code CLI**
+
+Run: `claude plugin validate .`
+Expected: validation success (no errors reported, exit code 0).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add hooks/ hooks-handlers/
+git commit -m "feat: add SessionStart hook injecting English-tutor instructions"
+```
+
+---
+
+### Task 4: README and LICENSE
+
+**Files:**
+- Create: `README.md`
+- Create: `LICENSE`
+
+- [ ] **Step 1: Write `README.md`**
+
+````markdown
+# eng-tutor-followup
+
+A tiny Claude Code plugin that works like a language teacher quietly taking
+notes during your lesson: while you work on your normal tasks, Claude
+occasionally drops a small tip on how to make your English phrasing sound
+more natural.
+
+```
+★ English tip ─────────────────────────────────
+You wrote:      "fast software development cycle"
+More natural:   "rapid development cycle"
+"Rapid" collocates with cycle/pace/iteration — "fast" isn't wrong,
+just less idiomatic. E.g., "we kept a rapid release cadence."
+─────────────────────────────────────────────────
+```
+
+## What it does
+
+A `SessionStart` hook injects a short instruction into every session telling
+Claude to quietly watch the English in **your own messages** and, when it
+notices something genuinely worth improving, append a small tip at the end of
+its response.
+
+- Focuses on **naturalness, word choice, collocations, idioms, and
+  professional register** (Slack messages, PR descriptions, emails) — not
+  grammar nitpicks.
+- **Max 1–2 tips per session; most sessions have zero.** It never invents a
+  tip just to fill a quota.
+- Only looks at your messages — never code, logs, or quoted text.
+- Nothing is stored anywhere; tips just appear in the conversation.
+
+## Install
+
+In Claude Code:
+
+```
+/plugin marketplace add gutnikov/eng-tutor-followup
+/plugin install eng-tutor-followup
+```
+
+Or from the terminal:
+
+```bash
+claude plugin marketplace add gutnikov/eng-tutor-followup
+claude plugin install eng-tutor-followup@eng-tutor-followup
+```
+
+Then start a new session.
+
+## Token cost
+
+The instructions (~250 tokens) are injected into **every** session. Don't
+install if you're not fine with that small overhead.
+
+## How it works
+
+Three files, same pattern as Anthropic's `explanatory-output-style` plugin:
+
+- `hooks/hooks.json` registers a `SessionStart` hook
+- `hooks-handlers/session-start.sh` emits `additionalContext` JSON with the
+  tutor instructions
+- the main model — which already sees your whole conversation — produces the
+  tips inline; no extra API calls, no extra processes, zero latency
+
+## License
+
+MIT
+````
+
+- [ ] **Step 2: Write `LICENSE`**
+
+```
+MIT License
+
+Copyright (c) 2026 Alex Gutnikov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+- [ ] **Step 3: Re-run validation to confirm nothing broke**
+
+Run: `bash tests/validate.sh`
+Expected: `ALL CHECKS PASS`
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add README.md LICENSE
+git commit -m "docs: add README and MIT license"
+```
+
+---
+
+### Task 5: Publish public GitHub repo
+
+**Files:** none (publishing only)
+
+- [ ] **Step 1: Create the public repo and push**
+
+Run:
+
+```bash
+gh repo create eng-tutor-followup --public --source=. --push \
+  --description "Claude Code plugin: occasional inline tips to make your English sound more natural"
+```
+
+Expected: repo created at `https://github.com/gutnikov/eng-tutor-followup`, `main` pushed.
+
+- [ ] **Step 2: Verify**
+
+Run: `gh repo view gutnikov/eng-tutor-followup --json name,visibility,defaultBranchRef`
+Expected: `"name": "eng-tutor-followup"`, `"visibility": "PUBLIC"`, default branch `main`.
+
+---
+
+### Task 6: End-to-end verification from GitHub (manual, user-assisted)
+
+**Files:** none (verification only)
+
+- [ ] **Step 1: Add the marketplace and install the plugin from GitHub**
+
+Run:
+
+```bash
+claude plugin marketplace add gutnikov/eng-tutor-followup
+claude plugin install eng-tutor-followup@eng-tutor-followup
+```
+
+Expected: both commands succeed; `claude plugin list` shows `eng-tutor-followup` enabled.
+
+- [ ] **Step 2: Verify the tip appears in a fresh session**
+
+The user starts a **new** Claude Code session and sends a prompt with a known
+unnatural phrasing, e.g.:
+
+> "please help me to make more fast the software development cycle in our team — write a short plan"
+
+Expected: the response ends with a `★ English tip` box suggesting a more
+natural phrasing. Note: tips are probabilistic by design ("most sessions
+zero") — if no tip appears, try once more with even more obviously unnatural
+phrasing; that's within spec, not a failure.
+
+- [ ] **Step 3: Verify terse prompts produce no tip**
+
+In the same session, the user sends `run ls`.
+Expected: no English tip in the response.
+
+---
+
+## Self-review notes
+
+- **Spec coverage:** repo layout → Tasks 1–4; hook + instructions → Task 3 (wording matches spec verbatim, JSON-escaped); distribution via public GitHub repo + marketplace → Tasks 2 & 5; testing (JSON validity + manual E2E) → Tasks 1 and 6; token-cost warning in README → Task 4. No persistence, no extra components — matches "no persistence" requirement.
+- **Types/names consistency:** plugin name `eng-tutor-followup` identical across plugin.json, marketplace.json, install commands, and repo name. Marketplace name equals repo name, so the install spec is `eng-tutor-followup@eng-tutor-followup`.
+- **No placeholders:** every file's full content is inlined above.
