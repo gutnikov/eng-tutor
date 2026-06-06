@@ -54,7 +54,7 @@ Then start a new session.
 
 ## Token cost
 
-The instructions (~250 tokens) are injected into **every** session. Don't
+The instructions (~400 tokens) are injected into **every** session. Don't
 install if you're not fine with that small overhead.
 
 ## How it works
