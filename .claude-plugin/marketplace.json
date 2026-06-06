@@ -1,0 +1,13 @@
+{
+  "name": "eng-tutor-followup",
+  "owner": {
+    "name": "gutnikov"
+  },
+  "plugins": [
+    {
+      "name": "eng-tutor-followup",
+      "source": "./",
+      "description": "Occasional inline tips that make your English sound more natural — like a teacher's followup notes after a lesson"
+    }
+  ]
+}
