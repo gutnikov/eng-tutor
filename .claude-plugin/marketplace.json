@@ -1,5 +1,6 @@
 {
   "name": "eng-tutor-followup",
+  "description": "Single-plugin marketplace for the eng-tutor-followup plugin — occasional inline tips to make your English sound more natural",
   "owner": {
     "name": "gutnikov"
   },
