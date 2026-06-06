@@ -26,6 +26,9 @@ its response.
   grammar nitpicks.
 - Prefers **modern, current phrasing** — the way an engineer at a big
   California tech company would put it today, not textbook English.
+- Pays extra attention to **collocations, hedging & softeners, ellipsis &
+  short replies, phrasal verbs, and verb-first phrasing** — the things that
+  actually make writing sound native.
 - **Max 1–2 tips per session; most sessions have zero.** It never invents a
   tip just to fill a quota.
 - Only looks at your messages — never code, logs, or quoted text.
