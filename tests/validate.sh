@@ -4,10 +4,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "1. plugin.json is valid and correctly named"
-jq -e '.name == "eng-tutor-followup"' .claude-plugin/plugin.json > /dev/null
+jq -e '.name == "eng-tutor"' .claude-plugin/plugin.json > /dev/null
 
 echo "2. marketplace.json lists this repo as the plugin source"
-jq -e '.plugins[0].name == "eng-tutor-followup" and .plugins[0].source == "./"' .claude-plugin/marketplace.json > /dev/null
+jq -e '.plugins[0].name == "eng-tutor" and .plugins[0].source == "./"' .claude-plugin/marketplace.json > /dev/null
 
 echo "3. hooks.json registers a SessionStart command hook"
 jq -e '.hooks.SessionStart[0].hooks[0].type == "command"' hooks/hooks.json > /dev/null

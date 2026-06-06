@@ -1,4 +1,4 @@
-# eng-tutor-followup
+# eng-tutor
 
 A tiny Claude Code plugin that works like a language teacher quietly taking
 notes during your lesson: while you work on your normal tasks, Claude
@@ -34,15 +34,15 @@ its response.
 In Claude Code:
 
 ```
-/plugin marketplace add gutnikov/eng-tutor-followup
-/plugin install eng-tutor-followup
+/plugin marketplace add gutnikov/eng-tutor
+/plugin install eng-tutor
 ```
 
 Or from the terminal:
 
 ```bash
-claude plugin marketplace add gutnikov/eng-tutor-followup
-claude plugin install eng-tutor-followup@eng-tutor-followup
+claude plugin marketplace add gutnikov/eng-tutor
+claude plugin install eng-tutor@eng-tutor
 ```
 
 Then start a new session.

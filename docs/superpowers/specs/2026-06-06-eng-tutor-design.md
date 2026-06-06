@@ -1,4 +1,4 @@
-# eng-tutor-followup plugin — Design
+# eng-tutor plugin — Design
 
 **Date:** 2026-06-06
 **Status:** Approved
@@ -27,14 +27,14 @@ extra processes, zero latency.
   Claude's output.
 - No persistence: tips are shown in the session only.
 - Distribution: **public GitHub repo** that is its own single-plugin marketplace, so
-  anyone can install via `/plugin marketplace add gutnikov/eng-tutor-followup`.
+  anyone can install via `/plugin marketplace add gutnikov/eng-tutor`.
 
 ## Architecture
 
 Identical pattern to `explanatory-output-style@1.0.0`:
 
 ```
-eng-tutor-followup/
+eng-tutor/
 ├── .claude-plugin/
 │   ├── plugin.json          # name, version, description, author
 │   └── marketplace.json     # single-plugin marketplace, source "./"
@@ -120,9 +120,9 @@ Claude Code degrades gracefully: the session simply starts without tutor context
 
 ## Distribution
 
-1. Public GitHub repo `gutnikov/eng-tutor-followup`.
+1. Public GitHub repo `gutnikov/eng-tutor`.
 2. `marketplace.json` lists the plugin with `"source": "./"`.
-3. Install: `/plugin marketplace add gutnikov/eng-tutor-followup` then
-   `/plugin install eng-tutor-followup`.
+3. Install: `/plugin marketplace add gutnikov/eng-tutor` then
+   `/plugin install eng-tutor`.
 4. README includes a token-cost warning (mirrors the explanatory plugin's warning)
    since the instructions are injected into every session.
