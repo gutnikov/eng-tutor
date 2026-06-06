@@ -6,7 +6,7 @@ occasionally drops a small tip on how to make your English phrasing sound
 more natural.
 
 ```
-★ English tip ─────────────────────────────────
+☕ English tip ─────────────────────────────────
 You wrote:      "fast software development cycle"
 More natural:   "rapid development cycle"
 "Rapid" collocates with cycle/pace/iteration — "fast" isn't wrong,
@@ -24,6 +24,8 @@ its response.
 - Focuses on **naturalness, word choice, collocations, idioms, and
   professional register** (Slack messages, PR descriptions, emails) — not
   grammar nitpicks.
+- Prefers **modern, current phrasing** — the way an engineer at a big
+  California tech company would put it today, not textbook English.
 - **Max 1–2 tips per session; most sessions have zero.** It never invents a
   tip just to fill a quota.
 - Only looks at your messages — never code, logs, or quoted text.
